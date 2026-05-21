@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable
+<title>Tracker GMF 2027</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0f14;
+    --surface: #161a22;
+    --surface2: #1e2330;
+    --border: #2a3145;
+    --accent: #5b8af0;
+    --green: #4ecb8c;
+    --red: #e05b7a;
+    --yellow: #f0d65b;
+    --orange: #f0a05b;
+    --text: #e8ecf5;
+    --muted: #6b7593;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    font-size: 14px;
+  }
+
+  /* ── LOADING SCREEN ── */
+  #loading-screen {
+    position: fixed; inset: 0;
+    background: var(--bg);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 16px; z-index: 100;
+    transition: opacity 0.4s;
+  }
+  #loading-screen.hidden { opacity: 0; pointer-events: none; }
+  .loader-ring {
+    width: 40px; height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loading-screen p { color: var(--muted); font-size: 12px; letter-spacing: 1px; }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 12px;
+    color: var(--text);
+    z-index: 200;
+    transform: translateY(20px);
+    opacity: 0;
+    transition: all 0.25s;
+    pointer-events: none;
+  }
+  #toast.show { transform: translateY(0); opacity: 1; }
+  #toast.ok   { border-color: var(--green); color: var(--green); }
+  #toast.err  { border-color: var(--red);   color: var(--red); }
+
+  /* ── HEADER ── */
+  header {
+    padding: 40px 40px 0;
+    display: flex; align-items: flex-end; justify-content: space-between;
+    flex-wrap: wrap; gap: 20px;
+  }
+  .title-block h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(28px, 4vw, 48px);
+    font-weight: 800; letter-spacing: -1px; line-height: 1;
+  }
+  .title-block h1 span { color: var(--accent); }
+  .title-block p { color: var(--muted); font-size: 12px; margin-top: 6px; letter-spacing: 1px; text-transform: uppercase; }
+
+  /* ── STATS ── */
+  .overall-stats {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    padding: 24px 40px;
+  }
+  .stat-pill {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 50px; padding: 10px 20px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .stat-pill .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .stat-pill .num { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; }
+  .stat-pill .label { color: var(--muted); font-size: 11px; }
+
+  /* ── PROGRESS BANNER ── */
+  .progress-banner {
+    margin: 0 40px 30px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px 20px;
+  }
+  .progress-banner .top {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+  }
+  .progress-banner .top span {
+    font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600;
+    letter-spacing: 1px; text-transform: uppercase; color: var(--muted);
+  }
+  .progress-banner .top strong {
+    font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; color: var(--accent);
+  }
+  .bar-outer { height: 8px; background: var(--bg); border-radius: 99px; overflow: hidden; }
+  .bar-inner {
+    height: 100%; border-radius: 99px;
+    background: linear-gradient(90deg, var(--accent), var(--green));
+    transition: width 0.6s cubic-bezier(.4,0,.2,1);
+  }
+
+  /* ── CONTROLS ── */
+  .controls {
+    padding: 0 40px 20px;
+    display: flex; gap: 10px; flex-wrap: wrap;
+  }
+  .filter-btn {
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--muted); font-family: 'DM Mono', monospace;
+    font-size: 11px; padding: 7px 14px; border-radius: 6px;
+    cursor: pointer; transition: all 0.15s;
+    letter-spacing: 0.5px; text-transform: uppercase;
+  }
+  .filter-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .search-wrap { margin-left: auto; position: relative; }
+  .search-wrap input {
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); font-family: 'DM Mono', monospace;
+    font-size: 12px; padding: 7px 14px 7px 34px;
+    border-radius: 6px; outline: none; width: 220px; transition: border-color 0.15s;
+  }
+  .search-wrap input:focus { border-color: var(--accent); }
+  .search-wrap::before {
+    content: '⌕'; position: absolute; left: 10px; top: 50%;
+    transform: translateY(-50%); color: var(--muted); font-size: 16px; pointer-events: none;
+  }
+
+  /* ── LEGEND ── */
+  .legend {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    padding: 0 40px 20px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 2px; }
+
+  /* ── MAIN ── */
+  .main { padding: 0 40px 60px; display: flex; flex-direction: column; gap: 24px; }
+
+  /* ── DISCIPLINE ── */
+  .discipline {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden; transition: border-color 0.2s;
+  }
+  .discipline:hover { border-color: #3a4560; }
+  .discipline-header {
+    padding: 18px 22px; display: flex; align-items: center; gap: 14px;
+    cursor: pointer; user-select: none;
+  }
+  .discipline-badge {
+    font-family: 'Syne', sans-serif; font-size: 10px; font-weight: 700;
+    padding: 4px 10px; border-radius: 4px;
+    text-transform: uppercase; letter-spacing: 1px; flex-shrink: 0;
+  }
+  .discipline-name { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; flex: 1; }
+  .disc-progress { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .disc-mini-bar { width: 80px; height: 4px; background: var(--bg); border-radius: 99px; overflow: hidden; }
+  .disc-mini-fill { height: 100%; border-radius: 99px; transition: width 0.4s; }
+  .disc-pct { font-size: 12px; color: var(--muted); min-width: 30px; text-align: right; }
+  .chevron { color: var(--muted); font-size: 12px; transition: transform 0.2s; flex-shrink: 0; }
+  .discipline.open .chevron { transform: rotate(180deg); }
+
+  /* ── TOPICS ── */
+  .topics-list {
+    display: none; padding: 0 22px 18px;
+    flex-direction: column; gap: 4px;
+  }
+  .discipline.open .topics-list { display: flex; }
+
+  .topic-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 8px 12px; border-radius: 7px;
+    transition: background 0.15s; cursor: pointer;
+    position: relative;
+  }
+  .topic-row:hover { background: var(--surface2); }
+  .topic-row.hidden-filter { display: none; }
+  .topic-row.saving { opacity: 0.6; pointer-events: none; }
+
+  .topic-check {
+    width: 18px; height: 18px; border-radius: 4px;
+    border: 2px solid var(--border); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s; font-size: 10px;
+  }
+  .topic-row.done     .topic-check { background: var(--green);  border-color: var(--green);  color: #fff; }
+  .topic-row.review   .topic-check { background: var(--yellow); border-color: var(--yellow); color: #000; }
+  .topic-row.studying .topic-check { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* O texto ocupa o espaço restante mas não "engole" o clique dos inputs */
+.topic-text {
+    flex: 1;
+    padding: 15px 0; /* Aumenta a área de toque vertical */
+    font-size: 14px;
+    user-select: none;
+}
+  .topic-row.done .topic-text { color: var(--muted); text-decoration: line-through; }
+
+/* Espaçamento para o dedo não esbarrar no texto */
+.bagagem {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 15px; /* Empurra os inputs para longe do texto */
+    z-index: 10;
+}
+  
+  .bag-chip {
+    font-size: 9px; font-family: 'DM Mono', monospace;
+    padding: 2px 6px; border-radius: 3px; white-space: nowrap;
+  }
+  .bag-chip.q   { background: rgba(91,138,240,0.12); color: #5b8af0; border: 1px solid rgba(91,138,240,0.25); }
+  .bag-chip.a   { background: rgba(78,203,140,0.12); color: #4ecb8c; border: 1px solid rgba(78,203,140,0.25); }
+  .bag-chip.ph  { background: rgba(78,203,140,0.15); color: #4ecb8c; border: 1px solid rgba(78,203,140,0.3); font-weight:500; }
+  .bag-chip.pm  { background: rgba(240,214,91,0.15); color: #f0d65b; border: 1px solid rgba(240,214,91,0.3); font-weight:500; }
+  .bag-chip.pl  { background: rgba(224,91,122,0.15); color: #e05b7a; border: 1px solid rgba(224,91,122,0.3); font-weight:500; }
+
+  .topic-status-btn { display: flex; gap: 4px; }
+  .sbt {
+    font-size: 9px; padding: 3px 7px; border-radius: 4px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--muted); cursor: pointer;
+    font-family: 'DM Mono', monospace;
+    text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.12s;
+  }
+  .sbt:hover { opacity: 0.8; }
+  .sbt.s-done   { border-color: var(--green);  color: var(--green); }
+  .sbt.s-done.active   { background: var(--green);  color: #000; }
+  .sbt.s-review { border-color: var(--yellow); color: var(--yellow); }
+  .sbt.s-review.active { background: var(--yellow); color: #000; }
+  .sbt.s-studying { border-color: var(--accent); color: var(--accent); }
+  .sbt.s-studying.active { background: var(--accent); color: #fff; }
+
+  /* discipline color themes */
+  .d-port    { --dc: #f472b6; }
+  .d-racioc  { --dc: #34d399; }
+  .d-def     { --dc: #fb923c; }
+  .d-legis   { --dc: #60a5fa; }
+  .d-const   { --dc: #f87171; }
+  .d-adm     { --dc: #4ade80; }
+  .d-civil   { --dc: #fbbf24; }
+  .d-pccivil { --dc: #c084fc; }
+  .d-penal   { --dc: #f43f5e; }
+  .d-pcpenal { --dc: #38bdf8; }
+
+  .discipline .discipline-badge { background: color-mix(in srgb, var(--dc) 15%, transparent); color: var(--dc); }
+  .discipline .disc-mini-fill   { background: var(--dc); }
+  .discipline .discipline-header:hover .discipline-name { color: var(--dc); }
+
+  .no-results { text-align: center; padding: 40px; color: var(--muted); display: none; font-size: 13px; }
+
+  @media (max-width: 600px) {
+    header, .overall-stats, .controls, .main, .legend { padding-left: 16px; padding-right: 16px; }
+    .progress-banner { margin: 0 16px 20px; }
+    .topic-status-btn, .bagagem { display: none; }
+    .search-wrap { margin-left: 0; width: 100%; }
+    .search-wrap input { width: 100%; }
+  }
+
+ /* Container que mantém as duas caixas fixas lado a lado */
+.bagagem { 
+    display: flex; 
+    align-items: center; 
+    gap: 8px; 
+    flex-shrink: 0; 
+    min-width: 110px; /* Garante que o bloco ocupe sempre o mesmo espaço */
+}
+
+/* Estilo fixo para as caixinhas */
+.bag-chip { 
+    display: flex; 
+    align-items: center; 
+    justify-content: center;
+    width: 50px;       /* Largura fixa para que não mudem de tamanho */
+    height: 35px; 
+    border-radius: 4px;
+    font-size: 10px; 
+    font-family: 'DM Mono', monospace;
+    position: relative;
+}
+
+/* Garante que o input seja o "dono" do clique */
+/* Estilo minimalista para o input dentro da chip */
+.bag-chip input {
+    width: 100%;
+    height: 100%;
+    background: transparent !important; /* Remove qualquer fundo branco */
+    border: none !important;            /* Remove bordas do navegador */
+    color: inherit;                     /* Usa a cor do texto da chip pai */
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    text-align: center;
+    cursor: pointer;
+    outline: none;                      /* Remove a borda azul ao clicar */
+    -webkit-appearance: none;           /* Remove estilo nativo do iOS/Android */
+    background: rgba(0, 0, 0, 0.2); /* Fundo sutilmente escuro dentro da chip */
+    transition: background 0.2s;
+  }
+  .bag-chip:hover {
+    background: rgba(255, 255, 255, 0.05); /* Fica mais claro ao passar o mouse */
+}
+/* Efeito visual ao clicar para editar */
+.bag-chip input:focus {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border-radius: 2px;
+}
+
+.bag-chip.q { background: rgba(91,138,240,0.12); color: #5b8af0; border: 1px solid rgba(91,138,240,0.25); }
+.bag-chip.a { background: rgba(78,203,140,0.12); color: #4ecb8c; border: 1px solid rgba(78,203,140,0.25); }
+/* Remove as setinhas (spinners) do input type="number" */
+.bag-chip input::-webkit-outer-spin-button,
+.bag-chip input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.bag-chip input[type=number] {
+  appearance: textfield;
+  -moz-appearance: textfield; /* Firefox */
+}
+
+@media (max-width: 600px) {
+    /* Reduz as margens laterais para aproveitar a tela do celular */
+    header, .overall-stats, .progress-banner, .controls, .main {
+        padding-left: 16px !important;
+        padding-right: 16px !important;
+    }
+
+    /* Ajusta o tamanho da fonte do título para não quebrar linha feio */
+    .title-block h1 {
+        font-size: 24px;
+    }
+
+    /* Garante que o container das caixas de input não fique grande demais */
+    .bagagem {
+        gap: 4px;
+        min-width: 90px;
+    }
+
+    .bag-chip {
+        width: 42px; /* Ligeiramente menor para caber melhor */
+    }
+}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loading-screen">
+  <div class="loader-ring"></div>
+  <p>Carregando tópicos...</p>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<header>
+  <div class="title-block">
+    <h1>projeto <span>GMF 2027</span></h1>
+    <p>Guarda Municipal de Fortaleza |  · Tracker de Estudos</p>
+  </div>
+</header>
+
+<div class="overall-stats">
+  <div class="stat-pill"><div class="dot" style="background:var(--green)"></div><span class="num" id="cnt-done">0</span><span class="label">Concluídos</span></div>
+  <div class="stat-pill"><div class="dot" style="background:var(--accent)"></div><span class="num" id="cnt-studying">0</span><span class="label">Estudando</span></div>
+  <div class="stat-pill"><div class="dot" style="background:var(--yellow)"></div><span class="num" id="cnt-review">0</span><span class="label">Revisar</span></div>
+  <div class="stat-pill"><div class="dot" style="background:var(--muted)"></div><span class="num" id="cnt-pending">0</span><span class="label">Pendentes</span></div>
+</div>
+
+<div class="progress-banner">
+  <div class="top">
+    <span>Progresso Geral</span>
+    <strong id="overall-pct">0%</strong>
+  </div>
+  <div class="bar-outer"><div class="bar-inner" id="overall-bar" style="width:0%"></div></div>
+</div>
+
+<div class="controls">
+  <button class="filter-btn active" data-filter="all">Todos</button>
+  <button class="filter-btn" data-filter="done">Concluídos</button>
+  <button class="filter-btn" data-filter="studying">Estudando</button>
+  <button class="filter-btn" data-filter="review">Revisar</button>
+  <button class="filter-btn" data-filter="pending">Pendentes</button>
+  <div class="search-wrap"><input type="text" id="search-input" placeholder="Buscar tópico..."></div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div> Concluído</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--accent)"></div> Estudando</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--yellow)"></div> Revisar</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--border)"></div> Pendente</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--orange)"></div><span style="color:var(--orange)">Bagagem GCM</span></div>
+</div>
+
+<div class="main" id="main-content">
+  <!-- preenchido pelo JavaScript -->
+</div>
+<div class="no-results" id="no-results">Nenhum tópico encontrado.</div>
+
+<script>
+// ══════════════════════════════════════════════
+//  CONFIGURAÇÃO — troque SUA_CHAVE_AQUI pela sua
+//  nova anon key gerada no Supabase
+// ══════════════════════════════════════════════
+const SUPABASE_URL = 'https://tjbgwtyxiunlnfeqavsm.supabase.co'
+const SUPABASE_KEY = 'sb_publishable_u4PlZKPkKQRbhndp9laVXQ_yGHlGuE8'
+
+// ── helpers de fetch ──────────────────────────
+
+// Busca todos os tópicos ordenados por id
+async function fetchTopicos() {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/topicos?order=id`, {
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`
+    }
+  })
+  if (!res.ok) throw new Error('Erro ao buscar tópicos')
+  return res.json()  // retorna um array de objetos
+}
+
+// Atualiza o status de um tópico pelo id
+async function updateStatus(id, status) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/topicos?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=minimal'
+    },
+    body: JSON.stringify({ status })
+  })
+  if (!res.ok) throw new Error('Erro ao salvar')
+}// Esta função envia a alteração para o Supabase automaticamente
+async function updateBagagem(id, campo, valor) {
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/topicos?id=eq.${id}`, {
+            method: 'PATCH',
+            headers: {
+                'apikey': SUPABASE_KEY,
+                'Authorization': `Bearer ${SUPABASE_KEY}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify({ [campo]: parseInt(valor) })
+        })
+        
+        if (res.ok) {
+            showToast('Salvo!', 'ok');
+            
+            // 1. Atualiza o valor local no objeto 't' para o cálculo bater
+            const row = document.querySelector(`[data-id="${id}"]`);
+            const qInput = row.querySelector('.bag-chip.q input').value;
+            const aInput = row.querySelector('.bag-chip.a input').value;
+            
+            // 2. Recalcula o percentual daquela linha específica
+            const pct = qInput > 0 ? Math.round((parseInt(aInput) / parseInt(qInput)) * 100) : 0;
+            const pctChip = row.querySelector('.bag-chip.ph, .bag-chip.pm, .bag-chip.pl');
+            if (pctChip) {
+                pctChip.textContent = pct + '%';
+                // Atualiza a cor baseado na nova porcentagem
+                pctChip.className = `bag-chip ${pct >= 75 ? 'ph' : pct >= 65 ? 'pm' : 'pl'}`;
+            }
+            
+            // 3. Atualiza os contadores gerais do topo da página
+            updateStats(); 
+        } else {
+            throw new Error('Erro na resposta do servidor');
+        }
+    } catch (err) {
+        showToast('Erro ao salvar', 'err');
+    }
+}
+
+// ── mapeamento disciplina → classe CSS ────────
+const DISC_CLASS = {
+  'Língua Portuguesa':              'd-port',
+  'Raciocínio Lógico-Matemático':   'd-racioc',
+  'Direitos das Pessoas com Deficiência': 'd-def',
+  'Legislação Estadual (CE)':       'd-legis',
+  'Direito Constitucional':         'd-const',
+  'Direito Administrativo':         'd-adm',
+  'Direito Civil':                  'd-civil',
+  'Direito Processual Civil':       'd-pccivil',
+  'Direito Penal':                  'd-penal',
+  'Direito Processual Penal':       'd-pcpenal',
+}
+
+const DISC_BADGE = {
+  'Língua Portuguesa':              'Geral',
+  'Raciocínio Lógico-Matemático':   'Geral',
+  'Direitos das Pessoas com Deficiência': 'Geral',
+  'Legislação Estadual (CE)':       'Geral',
+  'Direito Constitucional':         'Específico',
+  'Direito Administrativo':         'Específico',
+  'Direito Civil':                  'Específico',
+  'Direito Processual Civil':       'Específico',
+  'Direito Penal':                  'Específico',
+  'Direito Processual Penal':       'Específico',
+}
+
+const STATUS_CYCLE = ['', 'studying', 'review', 'done']
+const ICONS = { '': '', studying: '→', review: '!', done: '✓' }
+
+// ── toast ─────────────────────────────────────
+let toastTimer
+function showToast(msg, type = 'ok') {
+  const t = document.getElementById('toast')
+  t.textContent = msg
+  t.className = `show ${type}`
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => { t.className = '' }, 2000)
+}
+
+// ── constrói a interface a partir dos dados ───
+function buildUI(topicos) {
+  const container = document.getElementById('main-content')
+  container.innerHTML = ''
+
+  // agrupa por disciplina mantendo a ordem de aparição
+  const grupos = {}
+  const ordem  = []
+  for (const t of topicos) {
+    if (!grupos[t.disciplina]) {
+      grupos[t.disciplina] = []
+      ordem.push(t.disciplina)
+    }
+    grupos[t.disciplina].push(t)
+  }
+
+  for (const disc of ordem) {
+    const cls   = DISC_CLASS[disc] || ''
+    const badge = DISC_BADGE[disc] || ''
+    const rows  = grupos[disc]
+
+    // bloco disciplina
+    const bloco = document.createElement('div')
+    bloco.className = `discipline ${cls}`
+    bloco.dataset.disc = disc
+
+    bloco.innerHTML = `
+      <div class="discipline-header" onclick="toggleDisc(this)">
+        <span class="discipline-badge">${badge}</span>
+        <span class="discipline-name">${disc}</span>
+        <div class="disc-progress">
+          <div class="disc-mini-bar"><div class="disc-mini-fill" style="width:0%"></div></div>
+          <span class="disc-pct">0%</span>
+        </div>
+        <span class="chevron">▼</span>
+      </div>
+      <div class="topics-list"></div>
+    `
+
+    const lista = bloco.querySelector('.topics-list')
+
+    for (const t of rows) {
+      const row = document.createElement('div')
+      row.className = `topic-row ${t.status || ''}`
+      row.dataset.id     = t.id
+      row.dataset.status = t.status || ''
+
+      // bagagem GCM
+      let bagHTML = ''
+     if (t.feitas >= 0) {
+        const pct = t.feitas > 0 ? Math.round(t.acertadas / t.feitas * 100) : 0
+        const pctCls = pct >= 75 ? 'ph' : pct >= 65 ? 'pm' : 'pl'
+
+        bagHTML = `
+         <div class="bagagem">
+          <span class="bag-chip q">
+            <input type="number" value="${t.feitas}" onchange="updateBagagem(${t.id}, 'feitas', this.value)" onclick="event.stopPropagation()">Q
+          </span>
+          <span class="bag-chip a">
+            <input type="number" value="${t.acertadas}" onchange="updateBagagem(${t.id}, 'acertadas', this.value)" onclick="event.stopPropagation()">A
+          </span>
+          <span class="bag-chip ${pctCls}">${pct}%</span>
+        </div>`
+}
+      // 1. Define o conteúdo HTML da linha
+      row.innerHTML = `
+        <div class="topic-check">${ICONS[t.status] || ''}</div>
+        <span class="topic-text">${t.texto}</span>
+        ${bagHTML}
+        <div class="topic-status-btn">
+          <button class="sbt s-studying ${t.status==='studying'?'active':''}" onclick="setStatus(event,this.closest('.topic-row'),'studying')">Est</button>
+          <button class="sbt s-review ${t.status==='review'?'active':''}" onclick="setStatus(event,this.closest('.topic-row'),'review')">Rev</button>
+          <button class="sbt s-done ${t.status==='done'?'active':''}" onclick="setStatus(event,this.closest('.topic-row'),'done')">OK</button>
+        </div>
+      `;
+
+      // 2. Adiciona o evento de clique APENAS no texto para progredir status
+      const textElement = row.querySelector('.topic-text');
+      textElement.style.cursor = 'pointer'; 
+      textElement.addEventListener('click', (e) => {
+        cycleStatus(row);
+      });
+
+      // 3. Adiciona a linha na lista (uma única vez)
+      lista.appendChild(row);
+
+      // --- O QUE VOCÊ DEVE APAGAR DO SEU CÓDIGO ---
+      // Apague estas linhas abaixo que você ainda tem aí:
+      /* 
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('.topic-status-btn')) return
+        cycleStatus(row)
+      })
+      lista.appendChild(row) // <-- Isso estava duplicado!
+      */
+    }
+
+    container.appendChild(bloco)
+  }
+
+  updateStats()
+}
+
+// ── cicla status clicando na linha ────────────
+async function cycleStatus(row) {
+  const cur  = row.dataset.status || ''
+  const next = STATUS_CYCLE[(STATUS_CYCLE.indexOf(cur) + 1) % STATUS_CYCLE.length]
+  await applyStatus(row, next)
+}
+
+// ── define status pelo botão ──────────────────
+async function setStatus(e, row, status) {
+  e.stopPropagation()
+  const cur  = row.dataset.status || ''
+  const next = cur === status ? '' : status
+  await applyStatus(row, next)
+}
+
+// ── aplica status na UI e salva no banco ──────
+async function applyStatus(row, status) {
+  const id = row.dataset.id
+
+  // atualiza visual imediatamente (otimista)
+  STATUS_CYCLE.forEach(s => { if (s) row.classList.remove(s) })
+  if (status) row.classList.add(status)
+  row.dataset.status = status
+  row.querySelector('.topic-check').textContent = ICONS[status] || ''
+  row.querySelectorAll('.sbt').forEach(b => {
+    b.classList.toggle('active', b.classList.contains('s-' + status))
+  })
+
+  updateStats()
+
+  // salva no Supabase
+  row.classList.add('saving')
+  try {
+    await updateStatus(id, status)
+    showToast('Salvo ✓', 'ok')
+  } catch (err) {
+    showToast('Erro ao salvar', 'err')
+  } finally {
+    row.classList.remove('saving')
+  }
+}
+
+// ── abre/fecha disciplina ─────────────────────
+function toggleDisc(header) {
+  header.closest('.discipline').classList.toggle('open')
+}
+
+// ── atualiza contadores e barras ──────────────
+function updateStats() {
+  const allRows = [...document.querySelectorAll('.topic-row')]
+  const done     = allRows.filter(r => r.dataset.status === 'done').length
+  const studying = allRows.filter(r => r.dataset.status === 'studying').length
+  const review   = allRows.filter(r => r.dataset.status === 'review').length
+  const pending  = allRows.filter(r => !r.dataset.status).length
+  const total    = allRows.length
+  const pct      = total ? Math.round(done / total * 100) : 0
+
+  document.getElementById('cnt-done').textContent    = done
+  document.getElementById('cnt-studying').textContent = studying
+  document.getElementById('cnt-review').textContent  = review
+  document.getElementById('cnt-pending').textContent = pending
+  document.getElementById('overall-pct').textContent = pct + '%'
+  document.getElementById('overall-bar').style.width = pct + '%'
+
+  document.querySelectorAll('.discipline').forEach(disc => {
+    const rows = [...disc.querySelectorAll('.topic-row')]
+    const d = rows.filter(r => r.dataset.status === 'done').length
+    const t = rows.length
+    const p = t ? Math.round(d / t * 100) : 0
+    disc.querySelector('.disc-mini-fill').style.width = p + '%'
+    disc.querySelector('.disc-pct').textContent = p + '%'
+  })
+}
+
+// ── filtros ───────────────────────────────────
+let currentFilter = 'all'
+let currentSearch = ''
+
+function applyFilters() {
+  const rows = document.querySelectorAll('.topic-row')
+  let anyVisible = false
+
+  rows.forEach(row => {
+    const status = row.dataset.status || 'pending'
+    const text   = row.querySelector('.topic-text').textContent.toLowerCase()
+    const matchFilter = currentFilter === 'all'
+      || (currentFilter === 'pending' && !row.dataset.status)
+      || status === currentFilter
+    const matchSearch = !currentSearch || text.includes(currentSearch.toLowerCase())
+
+    if (matchFilter && matchSearch) {
+      row.classList.remove('hidden-filter')
+      anyVisible = true
+      if (currentSearch || currentFilter !== 'all') {
+        row.closest('.discipline').classList.add('open')
+      }
+    } else {
+      row.classList.add('hidden-filter')
+    }
+  })
+
+  document.getElementById('no-results').style.display = anyVisible ? 'none' : 'block'
+}
+
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'))
+    btn.classList.add('active')
+    currentFilter = btn.dataset.filter
+    applyFilters()
+  })
+})
+
+document.getElementById('search-input').addEventListener('input', e => {
+  currentSearch = e.target.value.trim()
+  applyFilters()
+})
+
+// ── inicialização ─────────────────────────────
+async function init() {
+  try {
+    const topicos = await fetchTopicos()  // busca do banco
+    buildUI(topicos)                      // monta a tela
+  } catch (err) {
+    document.getElementById('loading-screen').querySelector('p').textContent =
+      'Erro ao conectar. Verifique a chave do Supabase.'
+    return
+  }
+  // esconde o loading
+  const ls = document.getElementById('loading-screen')
+  ls.classList.add('hidden')
+  setTimeout(() => ls.remove(), 400)
+}
+
+init()
+</script>
+
+// Garante que ao tocar no input, o teclado numérico apareça corretamente
+
+document.querySelectorAll('input[type="number"]').forEach(input => {
+    input.setAttribute('inputmode', 'numeric');
+});
+</body>
+</html>
