@@ -368,6 +368,7 @@
   -moz-appearance: textfield; /* Firefox */
 }
 
+
 @media (max-width: 600px) {
     /* Reduz as margens laterais para aproveitar a tela do celular */
     header, .overall-stats, .progress-banner, .controls, .main {
@@ -458,7 +459,7 @@
   <div class="legend-item"><div class="legend-dot" style="background:var(--accent)"></div> Estudando</div>
   <div class="legend-item"><div class="legend-dot" style="background:var(--yellow)"></div> Revisar</div>
   <div class="legend-item"><div class="legend-dot" style="background:var(--border)"></div> Pendente</div>
-  <div class="legend-item"><div class="legend-dot" style="background:var(--orange)"></div><span style="color:var(--orange)">Bagagem GCM</span></div>
+  
 </div>
 
 <div class="main" id="main-content">
@@ -503,6 +504,7 @@ async function updateStatus(id, status) {
   if (!res.ok) throw new Error('Erro ao salvar')
 }// Esta função envia a alteração para o Supabase automaticamente
 async function updateBagagem(id, campo, valor) {
+    
     try {
         const res = await fetch(`${SUPABASE_URL}/rest/v1/topicos?id=eq.${id}`, {
             method: 'PATCH',
@@ -624,45 +626,47 @@ function buildUI(topicos) {
 
     // 2. LOOP DOS TÓPICOS: Apenas adiciona linhas dentro da lista
     for (const t of rows) {
-      const row = document.createElement('div')
-      row.className = `topic-row ${t.status || ''}`
-      row.dataset.id = t.id
-      row.dataset.status = t.status || ''
+      const row = document.createElement('div');
+      row.className = `topic-row ${t.status || ''}`;
+      row.dataset.id = t.id;
+      row.dataset.status = t.status || '';
 
-      let bagHTML = ''
-      if (t.feitas >= 0) {
-        const pct = t.feitas > 0 ? Math.round(t.acertadas / t.feitas * 100) : 0
-        const pctCls = pct >= 75 ? 'ph' : pct >= 65 ? 'pm' : 'pl'
+      const pct = t.feitas > 0 ? Math.round(t.acertadas / t.feitas * 100) : 0;
+      const pctCls = pct >= 75 ? 'ph' : pct >= 65 ? 'pm' : 'pl';
 
-        bagHTML = `
-           <div class="bagagem">
-            <span class="bag-chip q">
-              <input type="number" value="${t.feitas}" onchange="updateBagagem(${t.id}, 'feitas', this.value)" onclick="event.stopPropagation()">Q
-            </span>
-            <span class="bag-chip a">
-              <input type="number" value="${t.acertadas}" onchange="updateBagagem(${t.id}, 'acertadas', this.value)" onclick="event.stopPropagation()">A
-            </span>
-            <span class="bag-chip ${pctCls}">${pct}%</span>
-          </div>`
-      }
       
+      // O onblur garante que se ficar vazio, volta para 0
       row.innerHTML = `
         <div class="topic-check">${ICONS[t.status] || ''}</div>
         <span class="topic-text">${t.texto}</span>
-        ${bagHTML}
+        <div class="bagagem">
+            <span class="bag-chip q">
+                <input type="number" value="${t.feitas}" 
+                    onchange="updateBagagem(${t.id}, 'feitas', this.value)" 
+                    onblur="if(this.value==='') { this.value=0; updateBagagem(${t.id}, 'feitas', '0'); }" 
+                    onclick="event.stopPropagation()">Q
+            </span>
+            <span class="bag-chip a">
+                <input type="number" value="${t.acertadas}" 
+                    onchange="updateBagagem(${t.id}, 'acertadas', this.value)" 
+                    onblur="if(this.value==='') { this.value=0; updateBagagem(${t.id}, 'acertadas', '0'); }" 
+                    onclick="event.stopPropagation()">A
+            </span>
+            <span class="bag-chip ${pctCls}">${pct}%</span>
+        </div>
         <div class="topic-status-btn">
-          <button class="sbt s-studying ${t.status==='studying'?'active':''}" onclick="setStatus(event,this.closest('.topic-row'),'studying')">Est</button>
-          <button class="sbt s-review ${t.status==='review'?'active':''}" onclick="setStatus(event,this.closest('.topic-row'),'review')">Rev</button>
-          <button class="sbt s-done ${t.status==='done'?'active':''}" onclick="setStatus(event,this.closest('.topic-row'),'done')">OK</button>
+            <button class="sbt s-studying ${t.status==='studying'?'active':''}" onclick="setStatus(event,this.closest('.topic-row'),'studying')">Est</button>
+            <button class="sbt s-review ${t.status==='review'?'active':''}" onclick="setStatus(event,this.closest('.topic-row'),'review')">Rev</button>
+            <button class="sbt s-done ${t.status==='done'?'active':''}" onclick="setStatus(event,this.closest('.topic-row'),'done')">OK</button>
         </div>
       `;
 
-      // Evento de clique
+      // Evento de clique no texto
       const textElement = row.querySelector('.topic-text');
       textElement.style.cursor = 'pointer'; 
       textElement.addEventListener('click', () => cycleStatus(row));
 
-      lista.appendChild(row); // <--- Adiciona a linha aqui
+      lista.appendChild(row); 
     }
 
     container.appendChild(bloco) // <--- Adiciona o bloco completo ao container
@@ -720,51 +724,65 @@ function toggleDisc(header) {
 
 // ── atualiza contadores e barras ──────────────
 function updateStats() {
-  const allRows = [...document.querySelectorAll('.topic-row')];
-  
-  // 1. MANTÉM SEU PROGRESO ATUAL (Status)
-  const done = allRows.filter(r => r.dataset.status === 'done').length;
-  // ... (seus outros contadores de status)
-
-  let somaRendimentosMaterias = 0;
-  let totalDisciplinas = 0;
-
-  document.querySelectorAll('.discipline').forEach(disc => {
-    const rows = [...disc.querySelectorAll('.topic-row')];
+    const allRows = [...document.querySelectorAll('.topic-row')];
     
-    // A) Cálculo do Progresso (Status)
-    const d = rows.filter(r => r.dataset.status === 'done').length;
-    const t = rows.length;
-    const p = t ? Math.round(d / t * 100) : 0;
-    disc.querySelector('.disc-mini-fill').style.width = p + '%';
-    disc.querySelector('.disc-pct').textContent = p + '%';
+    // 1. Atualiza contadores gerais (Concluídos, etc)
+    document.getElementById('cnt-done').textContent = allRows.filter(r => r.dataset.status === 'done').length;
+    document.getElementById('cnt-studying').textContent = allRows.filter(r => r.dataset.status === 'studying').length;
+    document.getElementById('cnt-review').textContent = allRows.filter(r => r.dataset.status === 'review').length;
+    document.getElementById('cnt-pending').textContent = allRows.filter(r => !r.dataset.status || r.dataset.status === '').length;
 
-    // B) Cálculo do Rendimento (Acertos)
-    let somaPctTopicos = 0;
-    let topicosComQuestoes = 0;
-    rows.forEach(row => {
-      const q = parseInt(row.querySelector('.bag-chip.q input').value) || 0;
-      const a = parseInt(row.querySelector('.bag-chip.a input').value) || 0;
-      if (q > 0) {
-        somaPctTopicos += (a / q) * 100;
-        topicosComQuestoes++;
-      }
+    // Calcula Progresso Geral (barra do topo)
+    const total = allRows.length;
+    const done = allRows.filter(r => r.dataset.status === 'done').length;
+    const overallPct = total > 0 ? Math.round((done / total) * 100) : 0;
+    document.getElementById('overall-pct').textContent = overallPct + '%';
+    document.getElementById('overall-bar').style.width = overallPct + '%';
+
+    // 2. Cálculo do Rendimento por Matéria
+    let somaRendimentosAtivos = 0;
+    let disciplinasComQuestao = 0;
+
+    document.querySelectorAll('.discipline').forEach(disc => {
+        const rows = [...disc.querySelectorAll('.topic-row')];
+        
+        // A) Cálculo do Progresso (Status)
+        const d = rows.filter(r => r.dataset.status === 'done').length;
+        const t = rows.length;
+        const p = t ? Math.round(d / t * 100) : 0;
+        disc.querySelector('.disc-mini-fill').style.width = p + '%';
+        disc.querySelector('.disc-pct').textContent = p + '%';
+
+        // B) Cálculo do Rendimento (Acertos)
+        let somaPctTopicos = 0;
+        let topicosComQuestoes = 0;
+        
+        rows.forEach(row => {
+            const q = parseInt(row.querySelector('.bag-chip.q input').value) || 0;
+            const a = parseInt(row.querySelector('.bag-chip.a input').value) || 0;
+            if (q > 0) {
+                somaPctTopicos += (a / q) * 100;
+                topicosComQuestoes++;
+            }
+        });
+
+        const rendimentoMatéria = topicosComQuestoes > 0 ? Math.round(somaPctTopicos / topicosComQuestoes) : 0;
+        
+        // Atualiza UI da matéria
+        disc.querySelector('.disc-rendimento').textContent = rendimentoMatéria + '%';
+        
+        // SOMA APENAS SE TIVER RENDIMENTO (Para o cálculo geral)
+        if (rendimentoMatéria > 0) {
+            somaRendimentosAtivos += rendimentoMatéria;
+            disciplinasComQuestao++;
+        }
     });
 
-    const rendimentoMatéria = topicosComQuestoes > 0 ? Math.round(somaPctTopicos / topicosComQuestoes) : 0;
+    // Média Geral: Média das matérias que possuem questões respondidas
+    const mediaGeral = disciplinasComQuestao > 0 ? Math.round(somaRendimentosAtivos / disciplinasComQuestao) : 0;
     
-    // Atualiza o novo campo de rendimento ao lado do nome
-    disc.querySelector('.disc-rendimento').textContent = rendimentoMatéria + '%';
-    
-    somaRendimentosMaterias += rendimentoMatéria;
-    totalDisciplinas++;
-  });
-
-  // Média Geral: Média das médias das matérias
-  const mediaGeral = totalDisciplinas > 0 ? Math.round(somaRendimentosMaterias / totalDisciplinas) : 0;
-  
-  // Atualiza a caixa do topo
-  document.getElementById('avg-rendimento').textContent = mediaGeral + '%';
+    // Atualiza a caixa do topo
+    document.getElementById('avg-rendimento').textContent = mediaGeral + '%';
 }
 
 // ── filtros ───────────────────────────────────
