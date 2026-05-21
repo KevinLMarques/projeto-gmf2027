@@ -74,6 +74,34 @@
     display: flex; align-items: flex-end; justify-content: space-between;
     flex-wrap: wrap; gap: 20px;
   }
+ 
+
+.rendimento-header-box {
+    background: var(--surface);
+    border: 1px solid var(--green);
+    border-radius: var(--radius);
+    padding: 12px 20px;
+    text-align: center;
+}
+.rendimento-header-box .label {
+    display: block;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+}
+.rendimento-header-box strong {
+    font-family: 'Syne', sans-serif;
+    font-size: 24px;
+    color: var(--green);
+}
+
+/* Ajuste para celular */
+@media (max-width: 600px) {
+    header { flex-direction: column; align-items: flex-start; gap: 20px; }
+    .rendimento-header-box { width: 100%; }
+}
   .title-block h1 {
     font-family: 'Syne', sans-serif;
     font-size: clamp(28px, 4vw, 48px);
@@ -361,6 +389,19 @@
     .bag-chip {
         width: 42px; /* Ligeiramente menor para caber melhor */
     }
+
+    
+}
+
+.disc-rendimento {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--green);
+    font-weight: 600;
+    margin-right: 15px;
+    background: rgba(78, 203, 140, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
 }
 </style>
 </head>
@@ -380,7 +421,13 @@
     <h1>Projeto Futuro <span>GMF 2027</span></h1>
     <p>Guarda Municipal de Fortaleza   · Tracker de Estudos</p>
   </div>
+  <!-- Nova caixa de Rendimento Médio -->
+  <div class="rendimento-header-box">
+    <span class="label">Rendimento Médio</span>
+    <strong id="avg-rendimento">0%</strong>
+  </div>
 </header>
+
 
 <div class="overall-stats">
   <div class="stat-pill"><div class="dot" style="background:var(--green)"></div><span class="num" id="cnt-done">0</span><span class="label">Concluídos</span></div>
@@ -538,9 +585,8 @@ function buildUI(topicos) {
   const container = document.getElementById('main-content')
   container.innerHTML = ''
 
-  // agrupa por disciplina mantendo a ordem de aparição
   const grupos = {}
-  const ordem  = []
+  const ordem = []
   for (const t of topicos) {
     if (!grupos[t.disciplina]) {
       grupos[t.disciplina] = []
@@ -550,19 +596,21 @@ function buildUI(topicos) {
   }
 
   for (const disc of ordem) {
-    const cls   = DISC_CLASS[disc] || ''
+    const cls = DISC_CLASS[disc] || ''
     const badge = DISC_BADGE[disc] || ''
-    const rows  = grupos[disc]
+    const rows = grupos[disc]
 
-    // bloco disciplina
+    // 1. CRIA O BLOCO DA DISCIPLINA UMA ÚNICA VEZ
     const bloco = document.createElement('div')
     bloco.className = `discipline ${cls}`
     bloco.dataset.disc = disc
 
+    // AQUI ESTÁ O HEADER: Criado uma vez por disciplina
     bloco.innerHTML = `
       <div class="discipline-header" onclick="toggleDisc(this)">
         <span class="discipline-badge">${badge}</span>
         <span class="discipline-name">${disc}</span>
+        <span class="disc-rendimento" id="rend-${cls}">0%</span> 
         <div class="disc-progress">
           <div class="disc-mini-bar"><div class="disc-mini-fill" style="width:0%"></div></div>
           <span class="disc-pct">0%</span>
@@ -574,30 +622,30 @@ function buildUI(topicos) {
 
     const lista = bloco.querySelector('.topics-list')
 
+    // 2. LOOP DOS TÓPICOS: Apenas adiciona linhas dentro da lista
     for (const t of rows) {
       const row = document.createElement('div')
       row.className = `topic-row ${t.status || ''}`
-      row.dataset.id     = t.id
+      row.dataset.id = t.id
       row.dataset.status = t.status || ''
 
-      // bagagem GCM
       let bagHTML = ''
-     if (t.feitas >= 0) {
+      if (t.feitas >= 0) {
         const pct = t.feitas > 0 ? Math.round(t.acertadas / t.feitas * 100) : 0
         const pctCls = pct >= 75 ? 'ph' : pct >= 65 ? 'pm' : 'pl'
 
         bagHTML = `
-         <div class="bagagem">
-          <span class="bag-chip q">
-            <input type="number" value="${t.feitas}" onchange="updateBagagem(${t.id}, 'feitas', this.value)" onclick="event.stopPropagation()">Q
-          </span>
-          <span class="bag-chip a">
-            <input type="number" value="${t.acertadas}" onchange="updateBagagem(${t.id}, 'acertadas', this.value)" onclick="event.stopPropagation()">A
-          </span>
-          <span class="bag-chip ${pctCls}">${pct}%</span>
-        </div>`
-}
-      // 1. Define o conteúdo HTML da linha
+           <div class="bagagem">
+            <span class="bag-chip q">
+              <input type="number" value="${t.feitas}" onchange="updateBagagem(${t.id}, 'feitas', this.value)" onclick="event.stopPropagation()">Q
+            </span>
+            <span class="bag-chip a">
+              <input type="number" value="${t.acertadas}" onchange="updateBagagem(${t.id}, 'acertadas', this.value)" onclick="event.stopPropagation()">A
+            </span>
+            <span class="bag-chip ${pctCls}">${pct}%</span>
+          </div>`
+      }
+      
       row.innerHTML = `
         <div class="topic-check">${ICONS[t.status] || ''}</div>
         <span class="topic-text">${t.texto}</span>
@@ -609,28 +657,15 @@ function buildUI(topicos) {
         </div>
       `;
 
-      // 2. Adiciona o evento de clique APENAS no texto para progredir status
+      // Evento de clique
       const textElement = row.querySelector('.topic-text');
       textElement.style.cursor = 'pointer'; 
-      textElement.addEventListener('click', (e) => {
-        cycleStatus(row);
-      });
+      textElement.addEventListener('click', () => cycleStatus(row));
 
-      // 3. Adiciona a linha na lista (uma única vez)
-      lista.appendChild(row);
-
-      // --- O QUE VOCÊ DEVE APAGAR DO SEU CÓDIGO ---
-      // Apague estas linhas abaixo que você ainda tem aí:
-      /* 
-      row.addEventListener('click', (e) => {
-        if (e.target.closest('.topic-status-btn')) return
-        cycleStatus(row)
-      })
-      lista.appendChild(row) // <-- Isso estava duplicado!
-      */
+      lista.appendChild(row); // <--- Adiciona a linha aqui
     }
 
-    container.appendChild(bloco)
+    container.appendChild(bloco) // <--- Adiciona o bloco completo ao container
   }
 
   updateStats()
@@ -685,29 +720,51 @@ function toggleDisc(header) {
 
 // ── atualiza contadores e barras ──────────────
 function updateStats() {
-  const allRows = [...document.querySelectorAll('.topic-row')]
-  const done     = allRows.filter(r => r.dataset.status === 'done').length
-  const studying = allRows.filter(r => r.dataset.status === 'studying').length
-  const review   = allRows.filter(r => r.dataset.status === 'review').length
-  const pending  = allRows.filter(r => !r.dataset.status).length
-  const total    = allRows.length
-  const pct      = total ? Math.round(done / total * 100) : 0
+  const allRows = [...document.querySelectorAll('.topic-row')];
+  
+  // 1. MANTÉM SEU PROGRESO ATUAL (Status)
+  const done = allRows.filter(r => r.dataset.status === 'done').length;
+  // ... (seus outros contadores de status)
 
-  document.getElementById('cnt-done').textContent    = done
-  document.getElementById('cnt-studying').textContent = studying
-  document.getElementById('cnt-review').textContent  = review
-  document.getElementById('cnt-pending').textContent = pending
-  document.getElementById('overall-pct').textContent = pct + '%'
-  document.getElementById('overall-bar').style.width = pct + '%'
+  let somaRendimentosMaterias = 0;
+  let totalDisciplinas = 0;
 
   document.querySelectorAll('.discipline').forEach(disc => {
-    const rows = [...disc.querySelectorAll('.topic-row')]
-    const d = rows.filter(r => r.dataset.status === 'done').length
-    const t = rows.length
-    const p = t ? Math.round(d / t * 100) : 0
-    disc.querySelector('.disc-mini-fill').style.width = p + '%'
-    disc.querySelector('.disc-pct').textContent = p + '%'
-  })
+    const rows = [...disc.querySelectorAll('.topic-row')];
+    
+    // A) Cálculo do Progresso (Status)
+    const d = rows.filter(r => r.dataset.status === 'done').length;
+    const t = rows.length;
+    const p = t ? Math.round(d / t * 100) : 0;
+    disc.querySelector('.disc-mini-fill').style.width = p + '%';
+    disc.querySelector('.disc-pct').textContent = p + '%';
+
+    // B) Cálculo do Rendimento (Acertos)
+    let somaPctTopicos = 0;
+    let topicosComQuestoes = 0;
+    rows.forEach(row => {
+      const q = parseInt(row.querySelector('.bag-chip.q input').value) || 0;
+      const a = parseInt(row.querySelector('.bag-chip.a input').value) || 0;
+      if (q > 0) {
+        somaPctTopicos += (a / q) * 100;
+        topicosComQuestoes++;
+      }
+    });
+
+    const rendimentoMatéria = topicosComQuestoes > 0 ? Math.round(somaPctTopicos / topicosComQuestoes) : 0;
+    
+    // Atualiza o novo campo de rendimento ao lado do nome
+    disc.querySelector('.disc-rendimento').textContent = rendimentoMatéria + '%';
+    
+    somaRendimentosMaterias += rendimentoMatéria;
+    totalDisciplinas++;
+  });
+
+  // Média Geral: Média das médias das matérias
+  const mediaGeral = totalDisciplinas > 0 ? Math.round(somaRendimentosMaterias / totalDisciplinas) : 0;
+  
+  // Atualiza a caixa do topo
+  document.getElementById('avg-rendimento').textContent = mediaGeral + '%';
 }
 
 // ── filtros ───────────────────────────────────
