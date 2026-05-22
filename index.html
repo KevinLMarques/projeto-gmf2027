@@ -282,7 +282,7 @@
   /* discipline color themes */
   .d-port    { --dc: #f472b6; }
   .d-racioc  { --dc: #34d399; }
-  .d-def     { --dc: #fb923c; }
+  .d-info     { --dc: #fb923c; }
   .d-legis   { --dc: #60a5fa; }
   .d-const   { --dc: #f87171; }
   .d-adm     { --dc: #4ade80; }
@@ -290,6 +290,8 @@
   .d-pccivil { --dc: #c084fc; }
   .d-penal   { --dc: #f43f5e; }
   .d-pcpenal { --dc: #38bdf8; }
+  .d-legis-extra { --dc: #a78bfa; }
+
 
   .discipline .discipline-badge { background: color-mix(in srgb, var(--dc) 15%, transparent); color: var(--dc); }
   .discipline .disc-mini-fill   { background: var(--dc); }
@@ -547,26 +549,27 @@ async function updateBagagem(id, campo, valor) {
 // ── mapeamento disciplina → classe CSS ────────
 const DISC_CLASS = {
   'Língua Portuguesa':              'd-port',
-  'Raciocínio Lógico-Matemático':   'd-racioc',
+  'Raciocínio Lógico Matemático':   'd-racioc',
   'Direitos das Pessoas com Deficiência': 'd-def',
+  'Informática':       'd-info',
   'Legislação Estadual (CE)':       'd-legis',
   'Direito Constitucional':         'd-const',
   'Direito Administrativo':         'd-adm',
   'Direito Penal':                  'd-penal',
   'Direito Processual Penal':       'd-pcpenal',
+  'Legislação Extravagante':       'd-legis-extra',
 }
 
 const DISC_BADGE = {
   'Língua Portuguesa':              'Geral',
-  'Raciocínio Lógico-Matemático':   'Geral',
+  'Raciocínio Lógico Matemático':   'Geral',
   'Direitos das Pessoas com Deficiência': 'Geral',
-  'Legislação Estadual (CE)':       'Geral',
+  'Informática':       'Geral',
   'Direito Constitucional':         'Específico',
   'Direito Administrativo':         'Específico',
-  'Direito Civil':                  'Específico',
-  'Direito Processual Civil':       'Específico',
   'Direito Penal':                  'Específico',
   'Direito Processual Penal':       'Específico',
+  'Legislação Extravagante':       'Específico',
 }
 
 const STATUS_CYCLE = ['', 'studying', 'review', 'done']
