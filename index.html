@@ -438,6 +438,9 @@
   <div class="rendimento-header-box">
     <span class="label">Rendimento Médio</span>
     <strong id="avg-rendimento">0%</strong>
+    <span class="label" style="margin-top:6px; display:block;">
+      <span id="total-questoes">0</span> questões respondidas
+    </span>
   </div>
 </header>
 
@@ -803,9 +806,16 @@ function updateStats() {
 
     // Média Geral: Média das matérias que possuem questões respondidas
     const mediaGeral = disciplinasComQuestao > 0 ? Math.round(somaRendimentosAtivos / disciplinasComQuestao) : 0;
-    
+
+    // Total de questões respondidas (soma de Q de todos os tópicos)
+    let totalQuestoes = 0;
+    document.querySelectorAll('.topic-row').forEach(row => {
+        totalQuestoes += parseInt(row.querySelector('.bag-chip.q input').value) || 0;
+    });
+
     // Atualiza a caixa do topo
     document.getElementById('avg-rendimento').textContent = mediaGeral + '%';
+    document.getElementById('total-questoes').textContent = totalQuestoes;
 }
 
 // ── filtros ───────────────────────────────────
